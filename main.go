@@ -52,17 +52,27 @@ func main() {
 		return orgID
 	}
 
-	processFunction := func(in interface{}) interface{} {
-		msg := in.(map[string]string)
-		msg["status"] = "processed"
-		return msg
-	}
+	/*
+		func (p *Process) processFunction(in interface{}) interface{}{
+			msg := in.(map[string]string)
+			msg["status"] = "processed"
+			return msg
+		}
+	*/
+
+	/*
+		processFunction := func(in interface{}) interface{} {
+			msg := in.(map[string]string)
+			msg["status"] = "processed"
+			return msg
+		}
+	*/
 
 	pipe.Source(source).
 		Map(mapFunction1).
 		Filter(filterFunction).
 		KeyBy(keyByFunction).
-		Process(processFunction).
+		Process(pipeline.NewIdentityProcessFuncFactory()).
 		Sink(sink)
 
 	pipe.Execute()

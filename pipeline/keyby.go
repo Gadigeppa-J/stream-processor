@@ -6,8 +6,8 @@ import (
 
 type KeyByProcessFlow struct {
 	//ctx         context.Context
-	processFunc KeyedProcessFunc
-	flow        *Flow
+	processFnFactory ProcessFuncFactory
+	flow             *Flow
 }
 
 func NewKeyByProcessFlow() *KeyByProcessFlow {
@@ -26,14 +26,17 @@ func (k *KeyByProcessFlow) StartKeyByProcessFlow(ctx context.Context, inStream <
 
 	go func() {
 		defer close(outStream)
-
+		var processFn ProcessFn
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case msg := <-inStream:
 				//fmt.Println("StartKeyByProcessFlow before processing: ", msg)
-				processedMsg := k.processFunc(msg)
+				if processFn == nil {
+					processFn = k.processFnFactory.NewProcessFunc()
+				}
+				processedMsg := processFn.Process(msg)
 				//fmt.Println("StartKeyByProcessFlow after processing: ", processedMsg)
 				select {
 				case <-ctx.Done():
@@ -51,7 +54,7 @@ func (k *KeyByProcessFlow) StartKeyByProcessFlow(ctx context.Context, inStream <
 
 type KeyedProcessFunc func(in interface{}) interface{}
 
-func (k *KeyByProcessFlow) Process(processFunc KeyedProcessFunc) *Flow {
-	k.processFunc = processFunc
+func (k *KeyByProcessFlow) Process(processFnFactory ProcessFuncFactory) *Flow {
+	k.processFnFactory = processFnFactory
 	return k.flow
 }
