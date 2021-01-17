@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 )
 
@@ -36,7 +37,17 @@ func NewProcessFn() ProcessFn {
 func (p *IdentityProcessFn) Process(in interface{}) interface{} {
 	msg := in.(map[string]string)
 
-	time.Sleep(time.Second * 10)
+	r := rand.Intn(120)
+
+	orgID, ok := msg["orgID"]
+
+	if ok {
+		fmt.Println("Waiting for :", r, " orgID: ", orgID)
+	} else {
+		fmt.Println("Waiting for :", r)
+	}
+
+	time.Sleep(time.Second * time.Duration(r))
 
 	msg["status"] = fmt.Sprint("processed-", p.state)
 	p.state++

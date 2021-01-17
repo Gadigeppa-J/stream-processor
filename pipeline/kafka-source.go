@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"container/list"
 	"context"
 	"fmt"
 	"os"
@@ -136,7 +137,9 @@ func (k *KafkaSource) ConsumeSinkStream(inStream <-chan interface{}) {
 
 	go func() {
 
-		barriersMap := make(map[string]int)
+		barriersMap := make(map[string]*BarrierEvent)
+		barriersQueue := list.New()
+
 		for {
 			select {
 			case <-k.ctx.Done():
@@ -146,24 +149,79 @@ func (k *KafkaSource) ConsumeSinkStream(inStream <-chan interface{}) {
 				case BarrierEvent:
 					be := msg.(BarrierEvent)
 					fmt.Println("Received Barrier event in source operator: ", be)
-					chunkCount, ok := barriersMap[be.id]
-					if ok {
-						chunkCount++
-						if chunkCount == be.chunkCount {
-							fmt.Println("Commiting offset for message: ", be.msg)
-							k.consumer.CommitMessage(be.msg)
-							delete(barriersMap, be.id)
-						} else {
-							barriersMap[be.id] = chunkCount
+					bme, ok := barriersMap[be.id]
+					if !ok {
+						beCopy := be
+						barriersQueue.PushBack(&beCopy)
+						barriersMap[be.id] = &beCopy
+						bme = barriersMap[be.id]
+					}
+
+					bme.chunkCount--
+
+					curr := barriersQueue.Front()
+
+					for curr != nil {
+
+						if curr.Value.(*BarrierEvent).chunkCount > 0 {
+							break
 						}
+
+						barrierEvt := curr.Value.(*BarrierEvent)
+
+						fmt.Println("Commiting offset for message: ", barrierEvt.msg)
+						k.consumer.CommitMessage(barrierEvt.msg)
+
+						next := curr.Next()
+
+						// clean up
+						delete(barriersMap, barrierEvt.id)
+						barriersQueue.Remove(curr)
+
+						curr = next
+					}
+
+					//fmt.Println(curr)
+
+					if ok {
+
+						//bme.chunkCount--
+						/*
+							chunkCount++
+							if chunkCount == be.chunkCount {
+								fmt.Println("Commiting offset for message: ", be.msg)
+								k.consumer.CommitMessage(be.msg)
+								delete(barriersMap, be.id)
+							} else {
+								barriersMap[be.id] = chunkCount
+							}
+						*/
 					} else {
 
-						if be.chunkCount == 1 {
-							fmt.Println("Commiting offset for message: ", be.msg)
-							k.consumer.CommitMessage(be.msg)
-						} else {
-							barriersMap[be.id] = 1
-						}
+						/*
+							be.chunkCount--
+							barriersQueue.PushBack(&be)
+							barriersMap[be.id] = &be
+
+							/*
+								if be.chunkCount == 1 && barriersQueue.Len() == 0 {
+									// there is nothing in the queue. commit the offset directly
+									fmt.Println("Commiting offset for message: ", be.msg)
+									k.consumer.CommitMessage(be.msg)
+								} else {
+									be.chunkCount--
+									barriersQueue.PushBack(&be)
+									barriersMap[be.id] = &be
+								}
+						*/
+						/*
+							if be.chunkCount == 1 {
+								fmt.Println("Commiting offset for message: ", be.msg)
+								k.consumer.CommitMessage(be.msg)
+							} else {
+								barriersMap[be.id] = 1
+							}
+						*/
 					}
 
 				default:
