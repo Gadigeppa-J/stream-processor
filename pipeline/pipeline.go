@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"log"
+	"sync"
 )
 
 type Pipleline struct {
@@ -30,8 +31,10 @@ func (p *Pipleline) Sink(sink Sink) {
 
 func (p *Pipleline) Execute() {
 
+	var wg sync.WaitGroup
 	ctx, _ := context.WithCancel(context.Background())
 
+	wg.Add(1)
 	// check if source is set
 	if p.source == nil {
 		log.Fatal("Source is not set!")
@@ -56,11 +59,17 @@ func (p *Pipleline) Execute() {
 	p.sink.Initialize(ctx)
 	sinkStream := p.sink.StartSink(flowStream)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-sinkStream:
+	/*
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-sinkStream:
+			}
 		}
-	}
+	*/
+
+	p.source.ConsumeSinkStream(sinkStream)
+	wg.Wait()
+
 }

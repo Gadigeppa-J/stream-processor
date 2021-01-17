@@ -29,7 +29,13 @@ func (p *PrintSink) StartSink(inStream <-chan interface{}) <-chan interface{} {
 			case <-p.ctx.Done():
 				return
 			case v := <-inStream:
-				fmt.Println("Print Value: ", v)
+
+				switch v.(type) {
+				case BarrierEvent:
+				default:
+					fmt.Println("Print Value: ", v)
+				}
+
 				select {
 				case <-p.ctx.Done():
 					return

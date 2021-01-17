@@ -1,6 +1,9 @@
 package pipeline
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type ProcessFuncFactory interface {
 	NewProcessFunc() ProcessFn
@@ -32,6 +35,9 @@ func NewProcessFn() ProcessFn {
 
 func (p *IdentityProcessFn) Process(in interface{}) interface{} {
 	msg := in.(map[string]string)
+
+	time.Sleep(time.Second * 10)
+
 	msg["status"] = fmt.Sprint("processed-", p.state)
 	p.state++
 	return msg

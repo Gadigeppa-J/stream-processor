@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"stream-processor/pipeline"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -22,6 +23,11 @@ func main() {
 		// conver Kafka record to map
 		var result map[string]string
 		json.Unmarshal([]byte(str), &result)
+
+		if len(result) == 0 {
+			fmt.Println("map in intialized!!. creating an empty map")
+			result = make(map[string]string)
+		}
 
 		return result
 	}

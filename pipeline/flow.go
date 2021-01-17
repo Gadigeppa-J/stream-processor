@@ -71,7 +71,15 @@ func mapFlow(ctx context.Context, inStream <-chan interface{}, mapFunc MapFunc) 
 			case <-ctx.Done():
 				return
 			case in := <-inStream:
-				out := mapFunc(in)
+
+				var out interface{}
+				switch in.(type) {
+				case BarrierEvent:
+					out = in
+				default:
+					out = mapFunc(in)
+				}
+
 				//fmt.Println("Output of MapFunc: ", out)
 				select {
 				case <-ctx.Done():
@@ -99,7 +107,14 @@ func filterFlow(ctx context.Context, inStream <-chan interface{}, filterFunc Fil
 			case <-ctx.Done():
 				return
 			case in := <-inStream:
-				ok := filterFunc(in)
+
+				var ok bool
+				switch in.(type) {
+				case BarrierEvent:
+					ok = true
+				default:
+					ok = filterFunc(in)
+				}
 
 				if ok {
 					select {
@@ -161,31 +176,49 @@ func keyByFlow(ctx context.Context, inStream <-chan interface{}, keybyFunc KeyBy
 			case <-ctx.Done():
 				return
 			case in := <-inStream:
-				key := keybyFunc(in)
-				//fmt.Println("**Keyby: ", key)
-				outChn, ok := chanMap[key]
 
-				if !ok {
-					//fmt.Println("Channel not found for key: ", key)
-					outChn = make(chan interface{})
-					chanMap[key] = outChn
-					keybyChan := keybyProcessFlow.StartKeyByProcessFlow(ctx, outChn)
+				switch in.(type) {
+				case BarrierEvent:
+					eb := in.(BarrierEvent)
+					eb.chunkCount = len(chanMap)
+					for _, outChn := range chanMap {
+						select {
+						case <-ctx.Done():
+							return
+							// inject barrier event into all keyby stream
+						case outChn <- eb:
+						}
+					}
+
+				default:
+					key := keybyFunc(in)
+					//fmt.Println("**Keyby: ", key)
+					outChn, ok := chanMap[key]
+
+					if !ok {
+						//fmt.Println("Channel not found for key: ", key)
+						outChn = make(chan interface{})
+						chanMap[key] = outChn
+						keybyChan := keybyProcessFlow.StartKeyByProcessFlow(ctx, outChn)
+
+						select {
+						case <-ctx.Done():
+							return
+						case outChans <- keybyChan:
+						}
+					} else {
+						//fmt.Println("Channel found for key: ", key)
+					}
 
 					select {
 					case <-ctx.Done():
 						return
-					case outChans <- keybyChan:
+					case outChn <- in:
+						//fmt.Println("Sending ", in, " to KeyByProcessFlow")
 					}
-				} else {
-					//fmt.Println("Channel found for key: ", key)
+
 				}
 
-				select {
-				case <-ctx.Done():
-					return
-				case outChn <- in:
-					//fmt.Println("Sending ", in, " to KeyByProcessFlow")
-				}
 			}
 		}
 
