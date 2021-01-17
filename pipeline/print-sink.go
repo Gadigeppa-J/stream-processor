@@ -28,18 +28,25 @@ func (p *PrintSink) StartSink(inStream <-chan interface{}) <-chan interface{} {
 			select {
 			case <-p.ctx.Done():
 				return
-			case v := <-inStream:
+			case in := <-inStream:
 
-				switch v.(type) {
+				switch in.(type) {
 				case BarrierEvent:
+				case Message:
+					if in.(Message).err != nil {
+						fmt.Println("Print Error: ", in.(Message).err)
+					} else {
+						fmt.Println("Print Data: ", in.(Message).data)
+					}
+
 				default:
-					fmt.Println("Print Value: ", v)
+					//fmt.Println("Print Value: ", v)
 				}
 
 				select {
 				case <-p.ctx.Done():
 					return
-				case outStream <- v:
+				case outStream <- in:
 				}
 			}
 		}

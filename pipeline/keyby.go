@@ -31,18 +31,34 @@ func (k *KeyByProcessFlow) StartKeyByProcessFlow(ctx context.Context, inStream <
 			select {
 			case <-ctx.Done():
 				return
-			case msg := <-inStream:
+			case in := <-inStream:
 				//fmt.Println("StartKeyByProcessFlow before processing: ", msg)
 
 				var processedMsg interface{}
-				switch msg.(type) {
+				switch in.(type) {
 				case BarrierEvent:
-					processedMsg = msg
-				default:
-					if processFn == nil {
-						processFn = k.processFnFactory.NewProcessFunc()
+					processedMsg = in
+				case Message:
+
+					if in.(Message).err != nil {
+						processedMsg = in
+					} else {
+
+						if processFn == nil {
+							processFn = k.processFnFactory.NewProcessFunc()
+						}
+						msg := in.(Message)
+						msg.data = processFn.Process(msg.data)
+						processedMsg = msg
 					}
-					processedMsg = processFn.Process(msg)
+
+				default:
+					/*
+						if processFn == nil {
+							processFn = k.processFnFactory.NewProcessFunc()
+						}
+						processedMsg = processFn.Process(msg)
+					*/
 				}
 
 				//fmt.Println("StartKeyByProcessFlow after processing: ", processedMsg)

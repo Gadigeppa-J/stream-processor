@@ -79,10 +79,14 @@ func (k *KafkaSource) StartStream() <-chan interface{} {
 
 			case *kafka.Message:
 				fmt.Printf("Message on %s: %s\n", e.TopicPartition, string(e.Value))
+				msg := Message{
+					meta: e,
+					data: e,
+				}
 				select {
 				case <-k.ctx.Done():
 					return
-				case outStream <- e:
+				case outStream <- msg:
 					lastEmittedMsg = &LastEmittedMessage{e}
 					select {
 					case <-k.ctx.Done():
@@ -158,7 +162,6 @@ func (k *KafkaSource) ConsumeSinkStream(inStream <-chan interface{}) {
 					}
 
 					bme.chunkCount--
-
 					curr := barriersQueue.Front()
 
 					for curr != nil {
@@ -181,47 +184,10 @@ func (k *KafkaSource) ConsumeSinkStream(inStream <-chan interface{}) {
 						curr = next
 					}
 
-					//fmt.Println(curr)
-
-					if ok {
-
-						//bme.chunkCount--
-						/*
-							chunkCount++
-							if chunkCount == be.chunkCount {
-								fmt.Println("Commiting offset for message: ", be.msg)
-								k.consumer.CommitMessage(be.msg)
-								delete(barriersMap, be.id)
-							} else {
-								barriersMap[be.id] = chunkCount
-							}
-						*/
-					} else {
-
-						/*
-							be.chunkCount--
-							barriersQueue.PushBack(&be)
-							barriersMap[be.id] = &be
-
-							/*
-								if be.chunkCount == 1 && barriersQueue.Len() == 0 {
-									// there is nothing in the queue. commit the offset directly
-									fmt.Println("Commiting offset for message: ", be.msg)
-									k.consumer.CommitMessage(be.msg)
-								} else {
-									be.chunkCount--
-									barriersQueue.PushBack(&be)
-									barriersMap[be.id] = &be
-								}
-						*/
-						/*
-							if be.chunkCount == 1 {
-								fmt.Println("Commiting offset for message: ", be.msg)
-								k.consumer.CommitMessage(be.msg)
-							} else {
-								barriersMap[be.id] = 1
-							}
-						*/
+				case Message:
+					err := msg.(Message).err
+					if err != nil {
+						fmt.Println("Error: ", err)
 					}
 
 				default:
@@ -230,6 +196,12 @@ func (k *KafkaSource) ConsumeSinkStream(inStream <-chan interface{}) {
 		}
 	}()
 
+}
+
+type Message struct {
+	meta interface{}
+	data interface{}
+	err  error
 }
 
 type LastEmittedMessage struct {

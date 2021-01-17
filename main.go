@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"stream-processor/pipeline"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -16,7 +16,7 @@ func main() {
 	source := pipeline.NewKafkaSource()
 	sink := pipeline.NewPrintSink()
 
-	mapFunction1 := func(in interface{}) interface{} {
+	mapFunction1 := func(in interface{}) (interface{}, error) {
 		kafkaMsg := in.(*kafka.Message)
 		str := string(kafkaMsg.Value)
 
@@ -25,11 +25,12 @@ func main() {
 		json.Unmarshal([]byte(str), &result)
 
 		if len(result) == 0 {
-			fmt.Println("map in intialized!!. creating an empty map")
-			result = make(map[string]string)
+			return nil, errors.New("Unable to convert string to map")
+			//fmt.Println("map in intialized!!. creating an empty map")
+			//result = make(map[string]string)
 		}
 
-		return result
+		return result, nil
 	}
 
 	/*
